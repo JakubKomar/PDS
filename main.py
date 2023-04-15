@@ -2,76 +2,76 @@
 # -*- coding: utf-8 -*-
 
 from scapy.all import *
-
-
-def extract_dht_data(packet):
-    try:
-        if packet.haslayer(UDP):
-            
-            if packet.haslayer(DNS):
-                dnsParsing(packet)
-            else :
-                print(packet)
-                payload=packet[Raw].load
-                print(payload)
-                if payload[0:19]==b'.BitTorrentprotocol':
-                    print("kek")
-                    return
-                
-                dhsKek=payload[21]
-                print(dhsKek=='\x00' or dhsKek=='\x01' or dhsKek=='\x0a' or dhsKek=='0x0b')
-                """
-                if(    "ping" (0x00)
-                    "find_node" (0x01)
-                    "get_peers" (0x0a)
-                    "announce_peer" (0x0b))
-                """
-        elif False and packet.haslayer(TCP):
-            #print(packet)
-            payload=packet[Raw].load
-            
-            if payload[4]==0x04:
-                print("have piece")
-                print(packet)
-            elif payload[4]==0x14:
-                print("extended")
-                print(packet)
-            elif payload[4]==0x02:
-                print("interested")
-                print(packet)
-            elif payload[4]==0x06:
-                print("reguest")
-                print(packet)
-            elif payload[4]==0x01:
-                print("unchoke")
-                print(packet)
-            elif payload[4]==0x00:
-                print("choke")
-                print(packet)
-            elif payload[0]==0x13 and payload[1:20]==b'BitTorrent protocol':
-                print("handshake")
-                print(packet)
-                
-                
-    except Exception as ex:
-        ...
-        #print("exeption: ",ex)
-        
-
-def dnsParsing(packet):
-    ...
-    
-def bittorentParsing(packet):
-    ...    
-
-def dhtParsing(packet):
-    ...
+from os.path import exists
+from pathlib import Path
+from packetsParse import PacketParse
     
 if __name__ == "__main__":
     # Open the pcap file
-    pcap = rdpcap("logs/firstRun.pcapng",15000)
+    args=sys.argv
+    mode=-1
+    path=None
+    try: 
+        i=1
+        
+        while i< len(args):
+            arg=args[i]
+            
+            if arg== "-h" or arg=="--help":
+                print(
+"""Použití: bt-monitor -pcap <file.pcap>|-csv <file.csv> -init | -peers | -download
+<file.pcap>: input PCAP file or <file.csv> input CSV file
+-init: returns a list of detected bootstrap nodes (IP, port)
+-peers: returns a list of detected neighbors (IP, port, node ID, # of conn)
+-download: returns file info_hash, size, chunks, contributes (IP+port) """
+                )
+                exit(0)
+            else:
+                strList=arg.split('-')
+                if len(strList)<2:
+                    raise Exception("Chyba v parametrech, zkuste -h")
+                
+                arg=strList[1]
+                if arg=="pcap":
+                    i+=1
+                    if(i>= len(args)):
+                        raise Exception("Chyba v parametrech, zkuste -h")
+                    path=args[i]
+                elif arg=="init":
+                    if mode!=-1:
+                        raise Exception("Vyberete právě jeden mód běhu, zkuste -h")
+                    mode=0
+                    
+                elif arg=="peers":
+                    if mode!=-1:
+                        raise Exception("Vyberete právě jeden mód běhu, zkuste -h")
+                    mode=1
+                elif arg=="download":
+                    if mode!=-1:
+                        raise Exception("Vyberete právě jeden mód běhu, zkuste -h")
+                    mode=2
+                        
+                else:
+                    raise Exception("Chyba v parametrech, zkuste -h")
+            i+=1
+                       
+        if  path==None:
+            raise Exception("Nazadal jste soubor")
+        elif  not(exists(Path(path)) ):
+            raise Exception("Soubor neexistuje")
+
+    except Exception as ex:
+        print("Error:",ex)
+        exit(-1)
+    
+    
+    pcap = rdpcap(path,15000)
+    packetParser=PacketParse(mode)
+
 
     # Loop through each packet and extract DHT data
 
     for packet in pcap:
-        extract_dht_data(packet)
+        packetParser.parsePacket(packet)
+
+    packetParser.printResults()
