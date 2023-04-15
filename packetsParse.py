@@ -8,6 +8,7 @@ import re
 
 class PacketParse:
     bootStrapDns ={}
+    bootStrapPorts ={}
     bootStrapGetPeers =[]
     bootStrapResponse=[]
     
@@ -112,8 +113,10 @@ class PacketParse:
         if(self.mode==0):
             if b"y1" in strList and b"re" in strList :
                 self.bootStrapResponse.append(packet[sc.IP].src)
+                self.bootStrapPorts[packet[sc.IP].src]=packet[sc.UDP].sport
             elif  b"get_peers1" in strList:
                 self.bootStrapGetPeers.append(packet[sc.IP].dst)
+                self.bootStrapPorts[packet[sc.IP].dst]=packet[sc.UDP].dport
     
     def printResults(self):
 
@@ -121,4 +124,5 @@ class PacketParse:
             print("Bootstraps servers:")
             for key, value in self.bootStrapDns.items():
                 if key in self.bootStrapResponse or key in self.bootStrapGetPeers:
-                    print(key," (",value,")",sep="")
+                    port=self.bootStrapPorts[key]
+                    print(key,":",port," (",value,")",sep="")
