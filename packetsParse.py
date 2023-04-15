@@ -6,11 +6,40 @@ from os.path import exists
 from pathlib import Path
 import re
 
+
+class neighbor:
+    ip=None
+    port=None
+    nodeId=None
+    order=0
+    
+    
+    def __init__(self, ip,port,nodeId,order):
+        self.ip=ip
+        self.port=port
+        self.nodeId=nodeId
+        self.order=order
+    def __repr__(self):
+        return "neighbor()"
+    def __str__(self):
+        return "%d# Adress:%s:%s , NodeId:%s"%(self.order,self.ip,self.port,self.nodeId.hex())
+        
+class file:
+    recvPieces=0
+    sumLen=0
+    neigbors=None
+    sha1=None
+    
+    
+
 class PacketParse:
     bootStrapDns ={}
     bootStrapPorts ={}
     bootStrapGetPeers =[]
     bootStrapResponse=[]
+    
+    peers={}
+    peersCnt=0
     
     def __init__(self, mode):
         self.mode=mode
@@ -39,12 +68,10 @@ class PacketParse:
                         print("handshake")
                     elif payload[0]==0x64: #d
                         if payload[1]==0x31 or payload[1]==0x32:
-                            self.dhtParsing(packet,payload)
-                    
-                    
-            elif False and packet.haslayer(sc.TCP):
+                            self.dhtParsing(packet,payload)           
+            elif  packet.haslayer(sc.TCP):
                 #print(packet)
-                payload=packet[Raw].load
+                payload=packet[sc.Raw].load
                 self.bittorentParsing(packet,payload)
                     
                     
@@ -90,8 +117,18 @@ class PacketParse:
             print("choke")
             print(packet)
         elif payload[0]==0x13 and payload[1:20]==b'BitTorrent protocol':
-            print("handshake")
-            print(packet)    
+            print("handshake")#28
+            sha1=payload[28:48]
+            peerId=payload[48:68]
+            
+            ip=packet[sc.IP].dst
+            port=packet[sc.TCP].dport
+            
+           
+            self.peers[peerId]=neighbor(ip,port,peerId,self.peersCnt)
+            self.peersCnt+=1
+            
+
 
 
     def dhtParsingPayload(self,payload):
@@ -126,3 +163,7 @@ class PacketParse:
                 if key in self.bootStrapResponse or key in self.bootStrapGetPeers:
                     port=self.bootStrapPorts[key]
                     print(key,":",port," (",value,")",sep="")
+        elif self.mode==1:
+            print("Active neighbors:")
+            for key, value in self.peers.items():
+                print(value)

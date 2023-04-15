@@ -19,7 +19,7 @@ if __name__ == "__main__":
             
             if arg== "-h" or arg=="--help":
                 print(
-"""Použití: bt-monitor -pcap <file.pcap>|-csv <file.csv> -init | -peers | -download
+"""Použití: bt-monitor -pcap <file.pcap> -init | -peers | -download
 <file.pcap>: input PCAP file or <file.csv> input CSV file
 -init: returns a list of detected bootstrap nodes (IP, port)
 -peers: returns a list of detected neighbors (IP, port, node ID, # of conn)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
         exit(-1)
     
     
-    pcap = rdpcap(path,15000)
+    pcap = rdpcap(path,45000)
     packetParser=PacketParse(mode)
 
 
