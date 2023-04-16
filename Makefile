@@ -15,7 +15,7 @@ all: build
 build:create_env
 
 pack: 
-	zip -r 222161.zip main.py packetsParse.py README.md doc.pdf Makefile requirements.txt logs/*
+	zip -r 222161.zip main.py packetsParse.py README.md doc.pdf Makefile requirements.txt # logs/*
 
 run:
 	$(PYTHON) $(MAIN) $(ARGS)

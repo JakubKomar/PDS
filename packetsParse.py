@@ -256,7 +256,7 @@ class PacketParse:
             for key, value in self.files.items():
                 print(value)
                 init=value.getInitCont()
-                print("Download begined by:\n",self.peers[init])
+                print("Download begined by:\n",self.peers[init],sep="")
                 
                 contributors=value.getContributors()
                 print("Peers:")
