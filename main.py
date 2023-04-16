@@ -8,17 +8,14 @@ from pathlib import Path
 from packetsParse import PacketParse
     
 if __name__ == "__main__":
-    # Open the pcap file
     args=sys.argv
     mode=-1
     path=None
     packetLim=-1
     try: 
-        i=1
-        
+        i=1     
         while i< len(args):
             arg=args[i]
-            
             if arg== "-h" or arg=="--help":
                 print(
 """Nástroj pro analýzu bittorent provozu z pcap soubori
@@ -28,14 +25,12 @@ Použití: bt-monitor -pcap <file.pcap> -init | -peers | -download
 -peers: vrací seznam aktivních uzlů - probíhal mezi nimi užitečný provoz (IP, port, node ID, # of conn)
 -download: vrací podrobnosti o stahovaném souboru info_hash, size, chunks, contributes (IP+port)
 -packetLim: horní limit zpracovaných paketů - volitelný argument
-"""
-                )
+""")
                 exit(0)
             else:
                 strList=arg.split('-')
                 if len(strList)<2:
                     raise Exception("Chyba v parametrech, zkuste -h")
-                
                 arg=strList[1]
                 if arg=="pcap":
                     i+=1
@@ -61,8 +56,7 @@ Použití: bt-monitor -pcap <file.pcap> -init | -peers | -download
                     packetLim=args[i]
                 else:
                     raise Exception("Chyba v parametrech, zkuste -h")
-            i+=1
-                       
+            i+=1                  
         if  path==None:
             raise Exception("Nazadal jste soubor,zkuste -h")
         elif  not(exists(Path(path)) ):

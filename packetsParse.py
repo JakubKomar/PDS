@@ -7,7 +7,6 @@ from os.path import exists
 from pathlib import Path
 import re
 
-
 class neighbor:
     """
     struktura pro ukládání sousedů
@@ -62,7 +61,7 @@ class fileStat:
         return "fileStat()"
     
     def __str__(self):
-        return "Info_hash %s \n\tTotaly sended pieces %d ,Totaly sended %d B, Maximal Piece Size %d B"%(self.sha1.hex(),self.recvPieces,self.recvData,self.pieceSize)
+        return "Info_hash %s \nTotaly sended pieces %d ,Totaly sended %d B, Maximal Piece Size %d B"%(self.sha1.hex(),self.recvPieces,self.recvData,self.pieceSize)
 
     def __init__(self,sha1,srcIp ):
         self.sha1=sha1
@@ -257,14 +256,13 @@ class PacketParse:
             for key, value in self.files.items():
                 print(value)
                 init=value.getInitCont()
-                print("\tDownload begined by:\n\t",self.peers[init])
+                print("Download begined by:\n",self.peers[init])
                 
                 contributors=value.getContributors()
-                print("\tPeers:")
+                print("Peers:")
                 for cont in contributors:
                     id=cont.split(":")[0]
                     if(id in self.peers):
-                        print("\t",self.peers[id])
+                        print(self.peers[id])
                     else:
-                        print("\t",cont)
-+
+                        print(cont)
