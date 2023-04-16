@@ -1,6 +1,7 @@
-#Project name: Implementace hybrydního šifrování
-#autor: Bc. Jakub Komárek
-#File description: Implementace kryptografických metod
+# Monitoring of BitTorrent Traffic in LAN
+# PDS project
+# Academic year 2022/2023
+# autor: Bc. Jakub Komárek
 
 VENV = venv
 PYTHON = $(VENV)/bin/python3
