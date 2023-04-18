@@ -3,8 +3,6 @@
 # autor jakub komárek
 
 import scapy.all as sc
-from os.path import exists
-from pathlib import Path
 import re
 
 class neighbor:
@@ -39,7 +37,7 @@ class neighbor:
             ratio="%0.3f"%(self.recvData/self.sendedData)
         else:
             ratio="inf. "
-        return "%16s:%5s, NodeId: %s, Dwn/Up:%8d/%8d B, Ratio: %s, Pieces Send/recv %4d/%4d, Connections: %2s"%(self.ip,self.port,self.nodeId.hex(),
+        return "%-22s, NodeId: %s, Dwn/Up:%10d/%10d B, Ratio: %s, Pieces Send/recv %4d/%-4d, Connections: %2s"%(self.ip + ":" +str(self.port),self.nodeId.hex(),
             self.recvData,self.sendedData,ratio , self.recvPices,self.sendedPices ,self.connNum )
     def incUpload(self,size):
         self.sendedPices+=1
