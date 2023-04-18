@@ -13,83 +13,74 @@ class neighbor:
     """
     ip=None
     port=None
+    
     nodeId=None
-    order=0
     fileHash=None
-    connNum=0
+    connNum=1
+    
     sendedPices=0
     sendedData=0
     recvData=0
     recvPices=0
     
-    def __init__(self, ip,port,nodeId,order,fileHash):
+    def __init__(self, ip,port,nodeId,fileHash):
         self.ip=ip
         self.port=port
         self.nodeId=nodeId
-        self.order=order
         self.fileHash=fileHash
         
     def __repr__(self):
         return "neighbor()"
     
     def __str__(self):
-        return "%4d# %16s:%5s, InfoHash: %s Dwn/Up:%8d/%8d B, Ratio: %0.3f, Pieces Send/recv %4d/%4d, Connections: %2s"%(self.order,self.ip,self.port,self.nodeId.hex(),
-            self.recvData,self.sendedData, self.sendedData/self.recvData if self.recvData!=0 else 1 , self.recvPices,self.sendedPices ,self.connNum )
-    
-    def incConnNum(self):
-        self.connNum+=1
-    
-    def incData(self,sendedData):
-        self.sendedData+=sendedData
+        if self.sendedData==0:
+            ratio="0.000"
+        elif  self.recvData!=0:
+            ratio="%0.3f"%(self.recvData/self.sendedData)
+        else:
+            ratio="inf. "
+        return "%16s:%5s, NodeId: %s, Dwn/Up:%8d/%8d B, Ratio: %s, Pieces Send/recv %4d/%4d, Connections: %2s"%(self.ip,self.port,self.nodeId.hex(),
+            self.recvData,self.sendedData,ratio , self.recvPices,self.sendedPices ,self.connNum )
+    def incUpload(self,size):
         self.sendedPices+=1
-        
-    def incsendData(self,size):
+        self.sendedData+=size
+    def incDownload(self,size):
+            
         self.recvPices+=1
         self.recvData+=size
+    def incConnections(self):
+        self.connNum+=1
         
 class fileStat:
     """
     struktura obsahující záznamy o stahovaném souboru
     """
-    contributors=[]
     sha1=None
-    pieceSize=-1
-    recvPieces=0
-    recvData=0
+    maximalPieceIdex=0
+    maximalPiceLen=0
+    bitmapLen=0
 
     def __repr__(self):
         return "fileStat()"
     
     def __str__(self):
-        return "Info_hash %s \nTotaly sended pieces %d ,Totaly sended %d B, Maximal Piece Size %d B"%(self.sha1.hex(),self.recvPieces,self.recvData,self.pieceSize)
+        try:
+            piceNum= int(self.bitmapLen*8* (self.maximalPieceIdex/self.maximalPiceLen))
+        except:
+            piceNum=-1
+        return "Info_hash %s, PiceSize %dB , PiceCount %d, Filesize %dB"% (self.sha1.hex(),self.maximalPiceLen, piceNum,self.bitmapLen*8* (self.maximalPieceIdex+self.maximalPiceLen ) )
 
-    def __init__(self,sha1,srcIp ):
+    def __init__(self,srcIp,sha1 ):
         self.sha1=sha1
         self.srcIp=srcIp
-    
-    def addContributor(self,ip,port):
-        if ip==self.srcIp:
-            return
-        ID=ip+":"+str(port)
-        if not(ID in self.contributors ):
-            self.contributors.append(ID)
-            
-    def setPieceSize(self,new):
-        if self.pieceSize<new:
-            self.pieceSize=new
-            
-    def incSize(self,size):
-        self.recvPieces+=1
-        self.recvData+=size
-            
-    def getSha(self):
-        return self.sha1
-    
-    def getContributors(self):
-        return self.contributors
-    
-    def getInitCont(self):
-        return self.srcIp
+                
+    def setSize(self,size,offset):
+        if self.maximalPiceLen<size:
+            self.maximalPiceLen=size
+        if self.maximalPieceIdex<offset:
+            self.maximalPieceIdex=offset
+    def setBitmapSize(self,size):
+        self.bitmapLen=size
             
 class PacketParse:
     """
@@ -102,10 +93,11 @@ class PacketParse:
     bootStrapResponse=[]
     
     peers={}
-    peersCnt=0
-    
-    idsToSha={} #pomocná hasmapa mapující ip na info hash souboru
+    peersRecv=[]
+    nodesRecv=[]
     files={}
+    cotributorsToFiles={}
+    filesToContributors={}
     
     def __init__(self, mode):
         self.mode=mode
@@ -125,120 +117,162 @@ class PacketParse:
             packet: vstupní paket
         """
         try:
-            if packet.haslayer(sc.UDP):    
-                if packet.haslayer(sc.DNS):
+            if not packet.haslayer(sc.IP):
+                return
+            
+            ipSource=packet[sc.IP].src
+            ipDest=packet[sc.IP].dst
+
+            if packet.haslayer(sc.UDP):                 
+                if packet.haslayer(sc.DNS) and packet.haslayer(sc.DNSQR) and packet.haslayer(sc.DNSRR):
                     self.dnsParsing(packet)
                 else :
+                    portSource=packet[sc.UDP].sport
+                    portDest=packet[sc.UDP].dport
+                    if not packet.haslayer(sc.Raw):
+                        return
                     payload=packet[sc.Raw].load
                                         
                     if payload[0]==0x64: #d
                         if payload[1]==0x31 or payload[1]==0x32:
-                            self.dhtParsing(packet,payload)           
-            elif  packet.haslayer(sc.TCP):
+                            self.dhtParsing(packet,payload)   
+                    elif self.mode==1 or self.mode==2:
+                        self.bittorentParsing(ipSource,ipDest,portSource,portDest,payload[20:])
+            elif (self.mode==1 or self.mode==2 ) and packet.haslayer(sc.TCP):
+                if not packet.haslayer(sc.Raw):
+                    return
+                portSource=packet[sc.TCP].sport
+                portDest=packet[sc.TCP].dport
                 payload=packet[sc.Raw].load
-                self.bittorentParsing(packet,payload)      
+                
+                self.bittorentParsing(ipSource,ipDest,portSource,portDest,payload)      
                                            
         except Exception as ex:
-            ...
             #print("exeption: ",ex) 
+            ...
 
-    def dnsParsing(self,packet):        
-        if packet[sc.DNS].qr == 1:
-            domain_name = packet[sc.DNSQR].qname.decode('utf-8')
-            ip_address = packet[sc.DNSRR].rdata
-            if self.is_valid_ip(ip_address):
-                self.bootStrapDns[ip_address]=domain_name
+    def dnsParsing(self,packet):
+        try:               
+            if packet[sc.DNS].qr == 1:
+                domain_name = packet[sc.DNSQR].qname.decode('utf-8')
+                ip_address = packet[sc.DNSRR].rdata
+                if self.is_valid_ip(ip_address):
+                    self.bootStrapDns[ip_address]=domain_name
+        except:
+            ...
 
         
-    def bittorentParsing(self,packet,packetPayload):
+    def bittorentParsing(self,ipSource,ipDest,portSource,portDest,packetPayload):
+        
         if packetPayload[0]==0x13 and packetPayload[1:20]==b'BitTorrent protocol': #handshake
             sha1=packetPayload[28:48]
             peerId=packetPayload[48:68]
             
-            ip=packet[sc.IP].dst
-            port=packet[sc.TCP].dport
+            if ipSource in self.peers.keys():
+                self.peers[ipSource].incConnections()
+            else:
+                self.peers[ipSource]=neighbor(ipSource,portSource,peerId,sha1)
+             
+            if not (sha1 in self.files.keys()):
+                self.files[sha1]=fileStat(ipSource,sha1)
+
+
+            if not (ipSource in self.cotributorsToFiles.keys()):
+                self.cotributorsToFiles[ipSource]=sha1
+            if not (sha1 in self.filesToContributors.keys()):   
+                self.filesToContributors[sha1]=[ipSource]
+            else:
+                if not (ipSource in self.filesToContributors[sha1]):
+                    self.filesToContributors[sha1].append(ipSource)
             
-            ipSrc=packet[sc.IP].src
- 
-            if (self.mode==1  or self.mode==2):
-                if not(ip in self.peers.keys()):
-                    self.peers[ip]=neighbor(ip,port,peerId,self.peersCnt,sha1)
-                    self.peersCnt+=1
-                if  ipSrc in self.peers.keys():                     
-                    self.peers[ip].incConnNum()
-                if not(sha1 in self.files.keys() ):
-                    self.files[sha1]=fileStat(sha1,ipSrc)
-                self.idsToSha[ip]=sha1
-                self.files[sha1].addContributor(ip,port)
-        else:            
+        elif ipSource in self.peers.keys():     
             shift=0
             while True:  
                 if shift+4>=len(packetPayload):   
-                    break     
+                    break                  
                 lenght=int.from_bytes(packetPayload[shift:shift+4], "big") +4
                 
+                nokFlag=False
                 if lenght+shift>len(packetPayload):
                     payload=packetPayload[shift:]
+                    nokFlag=True
                 else:
                     payload=packetPayload[shift:shift+lenght]
                 
                 
                 if payload[4]==0x07:
-                    ip=packet[sc.IP].src
-                    ipDst=packet[sc.IP].dst
-                    port=packet[sc.TCP].sport
-                    
-                    size=int.from_bytes(payload[0:4], "big")-9
-                    
-                    if(size>262144):
-                        return                   
-                    if not(ip in self.peers.keys()):
-                        self.peers[ip]=neighbor(ip,port,peerId,self.peersCnt,b"")
-                    self.peers[ip].incData(size)   
-                    self.peers[ipDst].incsendData(size)
-                    if not(ip in self.idsToSha.keys()):
+                    size=int.from_bytes(payload[0:4], "big")
+                    offset=int.from_bytes(payload[9:13], "big")
+                    if size>64000: #maximální velikost je to pravděpodobně špatně
                         return
-                    sha=self.idsToSha[ip]                    
-                    self.files[sha].setPieceSize(size)
-                    self.files[sha].incSize(size)  
-                    self.files[sha].addContributor(ip,port) 
-                """
+                    sha=self.cotributorsToFiles[ipSource]
+                    self.files[sha].setSize(size,offset)
+                                            
+                    self.peers[ipSource].incUpload(size)
+                    self.peers[ipDest].incDownload(size)
+                elif nokFlag:
+                    return
                 elif payload[4]==0x05:
-                    print("bitField")
-                elif payload[0]==0x14:
-                    print("extended")
-                    print(packet)
-                elif payload[0]==0x02:
-                    print("interested")
-                    print(packet)
-                elif payload[0]==0x06:
-                    print("reguest")
-                    print(packet)
-                elif payload[0]==0x01:
-                    print("unchoke")
-                    print(packet)
-                elif payload[0]==0x00:
-                    print("choke")
-                    print(packet)
-                elif payload[0]==0x04:
-                    print("have piece")
-                    print(packet)
+                    sha=self.cotributorsToFiles[ipSource]
+                    size=int.from_bytes(payload[0:4], "big")-1
+                    self.files[sha].setBitmapSize(size)
+                """
+                elif payload[4]==0x14:
+                    print("extended",end=" ")                   
+                elif payload[4]==0x02:
+                    print("interested",end=" ")
+                elif payload[4]==0x06:
+                    print("reguest",end=" ")
+                elif payload[4]==0x01:
+                    print("unchoke",end=" ")
+                elif payload[4]==0x00:
+                    print("choke",end=" ")
+                elif payload[4]==0x04:
+                    #print("have piece",end=" ")
+                    ...
                 """
                 shift+=lenght
                 if shift>=len(packetPayload):
                     break
-            
                 
     def dhtParsing(self,packet,payload):            
         strList=payload.split(b':')
-        
-        if(self.mode==0):
+        if self.mode==0:
             if b"y1" in strList and b"re" in strList :
                 self.bootStrapResponse.append(packet[sc.IP].src)
                 self.bootStrapPorts[packet[sc.IP].src]=packet[sc.UDP].sport
             elif  b"get_peers1" in strList:
                 self.bootStrapGetPeers.append(packet[sc.IP].dst)
                 self.bootStrapPorts[packet[sc.IP].dst]=packet[sc.UDP].dport
+        else:
+            mesPeers=payload.split(b'6:')[1:]
+            for i in mesPeers:
+                ip_string = '.'.join(str(byte) for byte in i[0:4])
+                port=int.from_bytes(i[4:6], "big")
+                adr=ip_string+":"+str(port)
+                if not(adr in self.peersRecv):
+                    self.peersRecv.append(adr)
+                    
+            mesNodes=payload.split(b':nodes',1)[1]
+            if mesNodes[0:4]==b"208:":
+                nodes=8
+            elif mesNodes[0:4]==b"416:":
+                nodes=16
+            else:
+                return
+            mesNodes=mesNodes[4:]
+            
+            i=0
+            for j in range(0,nodes):                       
+                if i+26>len(mesNodes):
+                    break
+                id=mesNodes[i+0:i+20]
+                ip_string = '.'.join(str(byte) for byte in mesNodes[i+20:i+24])
+                port=int.from_bytes(mesNodes[i+24:i+26], "big")
+                string=("%-22s (%s)"%(ip_string+":"+str(port),id.hex()))
+                if not(string in self.nodesRecv):
+                    self.nodesRecv.append(string)
+                i+=26    
     
     def printResults(self):
         if self.mode==0:
@@ -251,18 +285,30 @@ class PacketParse:
             print("Active peers:")
             for key, value in self.peers.items():
                 print(value)
+                                    
+            print("\nAll received peers:")
+            
+            inp="Y"
+            if len( self.peersRecv   )>30:
+                inp=input("Je zde %d položek, opravdu je chcete vypsat? [Y/N]"% len(self.peersRecv)  )
+            if inp=="Y" or inp=="y":
+                for i in self.peersRecv:
+                    print(i)
+                    
+            print("\nAll received noodes:")
+            inp="Y"
+            if len( self.nodesRecv   )>30:
+                inp=input("Je zde %d položek, opravdu je chcete vypsat? [Y/N]"% len(self.nodesRecv)  )
+            if inp=="Y" or inp=="y":
+                for i in self.nodesRecv:
+                    print(i)
+                
         elif self.mode==2:
             print("Files:")
-            for key, value in self.files.items():
-                print(value)
-                init=value.getInitCont()
-                print("Download begined by:\n",self.peers[init],sep="")
-                
-                contributors=value.getContributors()
-                print("Peers:")
-                for cont in contributors:
-                    id=cont.split(":")[0]
-                    if(id in self.peers):
-                        print(self.peers[id])
-                    else:
-                        print(cont)
+            for key,file in self.files.items():
+                print(file) 
+                print("Contributors:")
+                for value in self.filesToContributors[key]:
+                    print(self.peers[value])
+
+

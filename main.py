@@ -10,7 +10,7 @@ from packetsParse import PacketParse
 if __name__ == "__main__":
     args=sys.argv
     mode=-1
-    path=None
+    path=" "
     packetLim=-1
     try: 
         i=1     
