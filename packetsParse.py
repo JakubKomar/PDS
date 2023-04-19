@@ -66,7 +66,7 @@ class fileStat:
             piceNum= int(self.bitmapLen*8* (self.maximalPieceIdex/self.maximalPiceLen))
         except:
             piceNum=-1
-        return "Info_hash %s, PiceSize %dB , PiceCount %d, Filesize %dB"% (self.sha1.hex(),self.maximalPiceLen, piceNum,self.bitmapLen*8* (self.maximalPieceIdex+self.maximalPiceLen ) )
+        return "Info_hash %s, PiceSize %dB ,PiceCount %d, ChuncksCount  %d, ChunckLen  %d, Filesize %dB"% (self.sha1.hex(),self.maximalPiceLen, piceNum,self.bitmapLen*8,self.maximalPieceIdex+self.maximalPiceLen,self.bitmapLen*8* (self.maximalPieceIdex+self.maximalPiceLen ) )
 
     def __init__(self,srcIp,sha1 ):
         self.sha1=sha1

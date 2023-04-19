@@ -29,6 +29,9 @@ vyžadované knihovny:
 
     scapy>= 2.5.0
 
+všechny testovací pcapy:
+https://owncloud.cesnet.cz/index.php/s/1UmBhvoEB5rUlWv
+
 
 ukázky spuštění:
 
